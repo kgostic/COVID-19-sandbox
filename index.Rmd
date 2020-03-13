@@ -113,4 +113,5 @@ simWControl %>% group_by(dispersion) %>%
   theme_classic()+
   ggtitle('With 50% of superspreading events prevented')
 ```
-Fig. 1. Fraction of infections caused by superspreaders vs. non-superspreaders. Arbitrarily define superspreaders as those causing 7 or more new infections. With control, reassign 50% of individuals with >=7 offspring to a lower number of offspring, randomly drawn from a truncated negative binomial with maximum value 6. Panels show three candidate values for the negative binomial dispersion paramter, k. All plots assume R0 = 2.5.
+
+Fig. 2. Fraction of infections caused by superspreaders vs. non-superspreaders. Arbitrarily define superspreaders as those causing 7 or more new infections. With control, reassign 50% of individuals with >=7 offspring to a lower number of offspring, randomly drawn from a truncated negative binomial with maximum value 6. Panels show three candidate values for the negative binomial dispersion paramter, k. All plots assume R0 = 2.5.
