@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 nsim = 10000
+ssThreshold = 7
 library(tidyverse)
 ```
 
@@ -26,13 +27,36 @@ Assume R0 = 2.5, and consider k = 1, .5, 0.1.
 ## Write a function to simulate offspring distributions in the absence of control
 get_offspring_dist = function(R0, k){
   data.frame(dispersion = k,
-             indivR0 = rnbinom(n = nsim, size = k, mu = R0))
+             nOffspring = rnbinom(n = nsim, size = k, mu = R0))
 }
 
 ## Simulate offspring distributions when dispersion parameter is 1, .5 and .1
 lapply(c(1, .5, .1), function(dd) get_offspring_dist(2.5, dd)) %>%
   bind_rows() -> sims
+
+
+sims %>% group_by(dispersion) %>%
+  mutate(R = mean(nOffspring)) %>%
+  ungroup() %>% group_by(dispersion, nOffspring) %>%
+  summarise(dens = n()/nsim,
+            R = unique(R)) %>%
+  ungroup() %>% group_by(dispersion) %>%
+  mutate(isSuperspreader = nOffspring>=7,
+         dIs = sum(dens[isSuperspreader]),
+         dDs = sum((dens*nOffspring)[isSuperspreader]/sum(dens*nOffspring))) %>%
+  ggplot()+
+  geom_bar(aes(x = nOffspring, y = dens, fill = isSuperspreader), stat = 'identity')+
+  facet_grid(dispersion~.) +
+  xlim(c(-.5, 20.5)) +
+  ylab('density') +
+  geom_text(aes(x = 10, y = .6, label = sprintf('R is %2.2f', R))) +
+    geom_text(aes(x = 10, y = .4, label = sprintf('%2.2f of infections caused by %2.2f of infected population', dDs, dIs)), color = 'cyan3') +
+  theme_classic()+
+  ggtitle('Without control')
 ```
+
+Fig. 1. Fraction of infections caused by superspreaders vs. non-superspreaders. Arbitrarily define superspreaders as those causing 7 or more new infections. Panels show three candidate values for the negative binomial dispersion paramter, k. All plots assume R0 = 2.5.
+
 
 
 ### Modify offspring distributions in the presence of control
@@ -53,7 +77,7 @@ get_reduced_r0 = function(origR0s, k, R0, superThreshold = 7){
 
 sims %>% ungroup() %>%
   group_by(dispersion) %>%
-  mutate(reducedR0 = get_reduced_r0(indivR0, k = unique(dispersion), R0 = 2.5, superThreshold = 7)) -> simWControl
+  mutate(reducedOffspring = get_reduced_r0(nOffspring, k = unique(dispersion), R0 = 2.5, superThreshold = 7)) -> simWControl
 ```
 
 ### Calculate the mean number of offpsring in the presence/absence of control
@@ -63,30 +87,30 @@ sims %>% ungroup() %>%
 ## Should be R0 without control
 simWControl %>%
   group_by(dispersion) %>% 
-  summarise(mean = mean(indivR0),
-            reducedMean = mean(reducedR0))
+  summarise(mean = mean(nOffspring),
+            reducedMean = mean(reducedOffspring))
 ```
 --> If k is low, we can dramatically reduce R just by preventing 50% of superspreading events 
 
 
-
-### !!! These numbers seem crazy to me, am I making a mistake? !!!
 ```{r}
-## Get the fraction of infected people who cause 80% and 90% of new cases
-## These numbers seem wacky. Am I doing this right?
-simWControl %>%
-  group_by(dispersion) %>% 
-  arrange(indivR0) %>%
-  mutate(fTns0 = cumsum(indivR0)/sum(indivR0),
-            fTnsC = cumsum(reducedR0)/sum(reducedR0)) %>%
-  summarise(fTns0_80 = sum(fTns0 >= .8),
-            fTns0_90 = sum(fTns0 >= .9))
+simWControl %>% group_by(dispersion) %>%
+  mutate(R = mean(reducedOffspring)) %>%
+  ungroup() %>% group_by(dispersion, reducedOffspring) %>%
+  summarise(dens = n()/nsim,
+            R = unique(R)) %>%
+  ungroup() %>% group_by(dispersion) %>%
+  mutate(isSuperspreader = reducedOffspring>=7,
+         dIs = sum(dens[isSuperspreader]),
+         dDs = sum((dens*reducedOffspring)[isSuperspreader]/sum(dens*reducedOffspring))) %>%
+  ggplot()+
+  geom_bar(aes(x = reducedOffspring, y = dens, fill = isSuperspreader), stat = 'identity')+
+  facet_grid(dispersion~.) +
+  xlim(c(-.5, 20.5)) +
+  ylab('density') +
+  geom_text(aes(x = 10, y = .6, label = sprintf('R is %2.2f', R))) +
+    geom_text(aes(x = 10, y = .4, label = sprintf('%2.2f of infections caused by %2.2f of infected population', dDs, dIs)), color = 'cyan3') +
+  theme_classic()+
+  ggtitle('With 50% of superspreading events prevented')
 ```
-
-### I have a vision for this figure, but no time to make it pretty
-```{r}
-simWControl %>%
-  ungroup() %>%
-  ggplot() +
-  geom_histogram(aes(indivR0, fill = dispersion, color = dispersion), binwidth = 1)
-```
+Fig. 1. Fraction of infections caused by superspreaders vs. non-superspreaders. Arbitrarily define superspreaders as those causing 7 or more new infections. With control, reassign 50% of individuals with >=7 offspring to a lower number of offspring, randomly drawn from a truncated negative binomial with maximum value 6. Panels show three candidate values for the negative binomial dispersion paramter, k. All plots assume R0 = 2.5.
