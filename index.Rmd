@@ -14,6 +14,10 @@ library(tidyverse)
 
 ## To what extent can we reduce R by focusing on reductions in superspreading, rather than attempting to prevent within-household transmission?
 
+** [Link to Google Doc Draft](https://docs.google.com/document/d/1YbamXMQHSTyJ6kY-9tAIA4W8SeRxAqz3KpvYV7CEXls/edit?usp=sharing) **
+
+** [Link to dispersion paramter sources](https://docs.google.com/spreadsheets/d/14BZdeISQBdA5JrkR0Q8qFfVoQxQH3Z4NMbW5nDxl2bw/edit?usp=sharing) **
+
 * China stopped the spread using extreme authoritarian measures to prevent within-household transmission
 * But we know that stopping superspreading should easier, and could substantially bring down Re
 
@@ -115,3 +119,47 @@ simWControl %>% group_by(dispersion) %>%
 ```
 
 Fig. 2. Fraction of infections caused by superspreaders vs. non-superspreaders. Arbitrarily define superspreaders as those causing 7 or more new infections. With control, reassign 50% of individuals with >=7 offspring to a lower number of offspring, randomly drawn from a truncated negative binomial with maximum value 6. Panels show three candidate values for the negative binomial dispersion paramter, k. All plots assume R0 = 2.5.
+
+
+```{r}
+sims %>% 
+  filter(dispersion == .5) %>%
+  ungroup() %>% group_by(nOffspring) %>%
+  summarise(dens = n()/nsim) %>%
+  ungroup() %>% 
+  mutate(fracNew = (dens*nOffspring)/sum(dens*nOffspring)) %>%
+  ggplot()+
+  geom_bar(aes(x = nOffspring, y = dens, fill = nOffspring, color = nOffspring), stat = 'identity')+
+  xlim(c(-.5, 20.5)) +
+  ylab('Infectious people\ntransmitting new cases\n(parents)') +
+  xlab('')+
+  #geom_text(aes(x = 10, y = .6, label = sprintf('R is %2.2f', R))) +
+    #geom_text(aes(x = 10, y = .4, label = sprintf('%2.2f of infections caused by %2.2f of infected population', dDs, dIs)), color = 'cyan3') +
+  theme_classic()+
+  #ggtitle('Parent infections') +
+    scale_color_viridis_c(option = 'inferno', guide = FALSE) +
+  scale_fill_viridis_c(option = 'inferno', guide = FALSE) -> aa
+
+
+sims %>% 
+  filter(dispersion == .5) %>%
+  ungroup() %>% group_by(nOffspring) %>%
+  summarise(dens = n()/nsim) %>%
+  ungroup() %>% 
+  mutate(fracNew = (dens*nOffspring)/sum(dens*nOffspring)) %>%
+  ggplot()+
+  geom_bar(aes(x = nOffspring, y = fracNew, fill = nOffspring, color = nOffspring), stat = 'identity')+
+  xlim(c(-.5, 20.5)) +
+  ylab('New cases transmitted\n(daughters)') +
+  xlab('# infections transmitted')+
+  #geom_text(aes(x = 10, y = .6, label = sprintf('R is %2.2f', R))) +
+    #geom_text(aes(x = 10, y = .4, label = sprintf('%2.2f of infections caused by %2.2f of infected population', dDs, dIs)), color = 'cyan3') +
+  theme_classic()+
+  #ggtitle('Daughter infections') +
+  scale_color_viridis_c(option = 'inferno', guide = FALSE) +
+  scale_fill_viridis_c(option = 'inferno', guide = FALSE) -> bb
+
+gridExtra::grid.arrange(aa, bb, nrow = 2)
+```
+
+Fig. 3. Just a few superspreaders (top), cause the majority of new infections (bottom). Here, k = 0.5.
