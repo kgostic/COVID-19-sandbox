@@ -70,14 +70,23 @@ Reassign controlled superspreaders a new number of offspring, drawn from a trunc
 ## ------------ IMPLEMENT CONTROL -------------- ##
 ## Define superspreader as anyone who causes 7 or more infections. See what happens to R0 if we move 50% of superspreaders into the non-superspreader category.
 ## Do this by sampling from a truncated negative binomial distribution with paramters R0 and k, and max value (threshold - 1)
-get_reduced_r0 = function(origR0s, k, R0, superThreshold = 7){
+get_reduced_r0 = function(origR0s, k, R0, superThreshold = 7, frac.averted = .5){
    isSuperspreader = origR0s >= superThreshold
-   toReplace = isSuperspreader & (runif(length(isSuperspreader)) > .5) ## Replace half of superspreaders
+   toReplace = isSuperspreader & (runif(length(isSuperspreader)) < frac.averted) ## Replace half of superspreaders
    newR0s = origR0s
    newR0s[toReplace] = sample(0:(superThreshold-1), size = sum(toReplace), replace = TRUE, prob = dnbinom(0:(superThreshold-1), size = k, mu = R0)/sum(dnbinom(0:(superThreshold-1), size = k, mu = R0)))
    newR0s
 }
 #get_reduced_r0(origR0s = 1:100, k = .5, R0 = 2.5)
+
+
+get_bestCaseReduced_r0 = function(origR0s, k, R0, superThreshold = 7, frac.averted = .5){
+   isSuperspreader = origR0s >= superThreshold
+   toReplace = isSuperspreader & (runif(length(isSuperspreader)) < frac.averted) ## Replace half of superspreaders
+   newR0s = origR0s
+   newR0s[toReplace] = rep(0, sum(toReplace))
+   newR0s
+}
 
 sims %>% ungroup() %>%
   group_by(dispersion) %>%
@@ -163,3 +172,78 @@ gridExtra::grid.arrange(aa, bb, nrow = 2)
 ```
 
 Fig. 3. Just a few superspreaders (top), cause the majority of new infections (bottom). Here, k = 0.5.
+
+
+```{r}
+## Test a grid of parameter values
+kk = c(.35, .58, 1.18)
+R0 = 2.5
+frac.averted = seq(.1, 1, by = .1)
+ss.threshold = c(3, 4, 5, 6, 7)
+
+od = function(R0, kk, frac.averted, ss.threshold){
+  get_offspring_dist(R0, kk) %>% as.tbl() %>%
+    mutate(reduced = get_reduced_r0(nOffspring, kk, R0, ss.threshold, frac.averted)) %>%
+    summarise(R0 = mean(nOffspring),
+              R0var = var(nOffspring),
+              R = mean(reduced),
+              Rvar = var(reduced)) %>%
+    mutate(R0 = R0, k = kk, frac.averted = frac.averted, ss.threshold = ss.threshold) %>%
+    as.data.frame() %>%
+    return()
+}
+# od(2.5, 1, .5, 7)
+
+test.grid = expand.grid(R0 = 2.5, kk = kk, frac.averted = frac.averted, ssThreshold = ss.threshold)
+simDf = apply(test.grid, MARGIN = 1, FUN = function(xx){od(xx[1], xx[2], xx[3], xx[4])}) %>%
+  bind_rows()
+
+
+
+simDf %>%
+  mutate(k = as.factor(k)) %>%
+  ggplot() +
+  geom_line(aes(x = frac.averted, y = R, color = k, group = k)) +
+  facet_grid(.~ss.threshold)+
+  geom_hline(aes(yintercept = 1)) +
+  theme_bw()
+ggsave('NecessaryReductions.png')
+```
+
+
+
+```{r}
+## Test a grid of parameter values
+kk = c(.35, .58, 1.18)
+R0 = 2.5
+frac.averted = seq(.1, 1, by = .1)
+ss.threshold = c(3, 4, 5, 6, 7)
+
+od = function(R0, kk, frac.averted, ss.threshold){
+  get_offspring_dist(R0, kk) %>% as.tbl() %>%
+    mutate(reduced = get_bestCaseReduced_r0(nOffspring, kk, R0, ss.threshold, frac.averted)) %>%
+    summarise(R0 = mean(nOffspring),
+              R0var = var(nOffspring),
+              R = mean(reduced),
+              Rvar = var(reduced)) %>%
+    mutate(R0 = R0, k = kk, frac.averted = frac.averted, ss.threshold = ss.threshold) %>%
+    as.data.frame() %>%
+    return()
+}
+# od(2.5, 1, .5, 7)
+
+test.grid = expand.grid(R0 = 2.5, kk = kk, frac.averted = frac.averted, ssThreshold = ss.threshold)
+simDf = apply(test.grid, MARGIN = 1, FUN = function(xx){od(xx[1], xx[2], xx[3], xx[4])}) %>%
+  bind_rows()
+
+
+
+simDf %>%
+  mutate(k = as.factor(k)) %>%
+  ggplot() +
+  geom_line(aes(x = frac.averted, y = R, color = k, group = k)) +
+  facet_grid(.~ss.threshold)+
+  geom_hline(aes(yintercept = 1)) +
+  theme_bw()
+ggsave('NecessaryReductions_bestcase.png')
+```
